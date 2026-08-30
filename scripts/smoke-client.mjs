@@ -152,7 +152,7 @@ assert.equal(remoteHandlers[0][0], 'settings/document-updated')
 assert.equal(slotRegs.length, 1, 'one settings card registered')
 const [cardOptions, CardComponent] = slotRegs[0]
 assert.equal(cardOptions.name, 'settings.plugin.item')
-assert.equal(cardOptions.id, 'mem0')
+assert.equal(cardOptions.key, 'dsh-mem0', 'keyed slot keyed by the settings namespace')
 assert.equal(cardOptions.locale, 'dsh-mem0')
 assert.equal(typeof cardOptions.inject, 'function')
 assert.equal(typeof CardComponent, 'function')

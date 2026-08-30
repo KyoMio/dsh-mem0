@@ -832,7 +832,9 @@ window.__ModuleLoader__.load({
               ctx.slots.register(
                 {
                   name: 'settings.plugin.item',
-                  id: 'mem0',
+                  // Keyed slot: `key` is the settings namespace this card edits;
+                  // the configurable-plugins tab pairs namespace -> card by it.
+                  key: NS,
                   order: 100,
                   locale: NS,
                   inject: () => controller.inject(),
