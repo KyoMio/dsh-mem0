@@ -76,8 +76,12 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
 3. **客户端 bundle 格式**。`client/client.cjs` 是 `window.__ModuleLoader__.load({ id:
    'dsh-mem0', factory })` 格式的手写纯 JS（无 TS/JSX/import），factory 返回
    `{ apply, inject }`。只能 `require` 平台模块：`react`、
-   `@deepseek-ai/dsh-client-runtime/client`（`createSnapshotStore`）。浏览器半边
+   `@deepseek-ai/dsh-client-store`（`createSnapshotStore`）。浏览器半边
    `inject = ['slots', 'locale', 'remote']`。改它时保持该格式，别引入打包器依赖。
+
+   > 注：dsh 0.1.2-rc.1 把浏览器端运行时从 `dsh-client-runtime` 重构为
+   > `dsh-client-store`（seed word 已变）；旧版 `dsh-client-runtime/client` 在
+   > 0.1.2-rc.1 已不在前端 seed 词表，require 会报 "missed the module table"。
 4. **`role('secret')` 的脱敏边界**。`apiKey` 在 schema 上标记 secret；`describe({ redactSecrets:
    true })` 会从 value/base/user 三层剥离它，只给 `secrets:[{path,set}]`。脱敏 walker 只沿
    object/dict/array 容器走——secret 放在 union/transform 里会被原样下发。新增敏感字段时保持
@@ -94,6 +98,16 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
 - `GET /memories/{id}/history` 返回**裸数组**（不是 `{results:[]}`）。
 - 批量删除 / reset 需要 admin 角色 + 明确 confirm 词。
 - `mem0_get all=true` 跨标识符列举需要 admin key。
+- **`POST /memories` 返回 `{"results":[]}` 不是失败**。服务端在事实抽取没产出、或判定该
+  内容与既有记忆重复时，返回 **HTTP 200 + 空 results**。工具据此报 `created: 0`（正常
+  分支，不是 `error`）——agent 看到 `added 0 memory/memories` 应理解为「没提取出新事实/
+  判定重复」，别当写入失败重试。实测：同一正文连发两次，第二次即空；换全新正文即入库
+  （与是否携带 `agent_id` 无关）。
+- **`POST /search` 的 `limit` 被忽略**，要限条数得用 `top_k`（客户端发的就是 `top_k`，
+  别改成 `limit`）。
+- **首调用冷启动很慢**：mem0 依赖链（DeepSeek LLM / SiliconFlow embedder）冷启动时首次
+  写入实测 76s 后 502、首次搜索 31s，热态分别 ~3s / ~0.4s。默认 `timeoutMs: 15000` 会
+  在这种冷启动下误报超时——重试即可；要避免噪音可调大 `timeoutMs`。
 - **序列化行（`_serialize_memory`）形状**：恒有 `hash` / `attributed_to`，新行有 `role`，
   `expiration_date` 常以 null 存在，且 `metadata` / `run_id` / `agent_id` / `created_at` /
   `updated_at` 在旧行上可能是 null。**工具输出 schema 必须容忍这些**（`MEMORY_ROW_SCHEMA`：
@@ -101,6 +115,13 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
   会让整个读路径被 harness 的输出校验拦死（ToolOutputError「invalid output」）。回归保障：
   `pnpm smoke:tools`。注意 dsh-tools 的 JSON Schema 子集**不支持 `type` 数组**（如
   `['string','null']`），可空必须用 oneOf。
+- **`score` 的形状在两条读路径上不同**：`GET /memories/{id}` **恒带 `score: null`**，
+  而 `GET /memories`（列表）**完全没有该键**。所以「`score !== undefined`」不足以判可
+  渲染——必须 `typeof score === 'number'`，否则按 id 读取会崩在
+  render（`Cannot read properties of null (reading 'toFixed')`，表现为
+  `ToolOutputError: output.render failed`）。schema 侧对应
+  `score: oneOf:[number, null]`。回归保障：`pnpm smoke:tools`（该用例既验 schema
+  **也真正调用 render**，因为 schema 通过而 render 崩也曾是一类漏网 bug）。
 
 ## 安全红线
 
