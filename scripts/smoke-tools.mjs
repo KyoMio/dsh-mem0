@@ -77,6 +77,54 @@ passes(mem0GetTool(client, config), {
   memory: FULL_ROW,
 }, 'mem0_get single')
 
+// Observed on the real build: GET /memories/{id} always carries `score: null`,
+// while GET /memories (list) omits the key entirely. Both must pass the schema
+// AND survive the renderer — a render-time `.toFixed()` on null crashed
+// mem0_get-by-id with "output.render failed: Cannot read properties of null".
+const SCORED_ROW = {
+  ...FULL_ROW,
+  metadata: null,
+  score: null,
+  created_at: '2026-08-02T19:52:17.493099+08:00',
+  updated_at: '2026-08-02T19:52:17.493099+08:00',
+}
+
+passes(mem0GetTool(client, config), {
+  ok: true,
+  memory: SCORED_ROW,
+}, 'mem0_get single (score: null)')
+
+passes(mem0GetTool(client, config), {
+  ok: true,
+  count: 1,
+  results: [SCORED_ROW],
+}, 'mem0_get list (score: null)')
+
+/** Render a tool output and return the joined text (throws on a renderer bug). */
+function renderText(tool, args, value) {
+  const blocks = tool.output.render(args, value)
+  return blocks.map((block) => block.text).join('')
+}
+
+const singleRow = SCORED_ROW
+const getTool = mem0GetTool(client, config)
+const singleText = renderText(getTool, { id: singleRow.id }, { ok: true, memory: singleRow })
+assert.ok(
+  singleText.includes(singleRow.memory) && !singleText.includes('score'),
+  `mem0_get single render must show the memory and no score badge, got: ${singleText}`,
+)
+assert.ok(
+  !renderText(getTool, {}, { ok: true, count: 1, results: [singleRow] }).includes('score'),
+  'mem0_get list render must not print a score badge for a null score',
+)
+
+const searchTool = mem0SearchTool(client, config)
+assert.ok(
+  renderText(searchTool, { query: 'tea' }, { ok: true, count: 1, results: [{ ...FULL_ROW, score: 0.8123 }] })
+    .includes('[score 0.812]'),
+  'mem0_search render must still format a numeric score',
+)
+
 // mem0_search: results add a score and still carry the full row.
 passes(mem0SearchTool(client, config), {
   ok: true,

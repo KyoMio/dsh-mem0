@@ -79,8 +79,8 @@ export interface Mem0Memory {
     metadata?: Record<string, JsonValue> | null;
     created_at?: string;
     updated_at?: string;
-    /** Search result extra fields. */
-    score?: number;
+    /** Search result extra fields. `null` on plain reads (GET /memories[/{id}]). */
+    score?: number | null;
     prev_value?: string;
     new_value?: string;
 }

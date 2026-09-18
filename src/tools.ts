@@ -28,7 +28,9 @@ function text(value: string): ContentBlock[] {
 /** Compact one-line view of a memory. */
 function renderMemory(m: Mem0Memory, index?: number): string {
   const prefix = index !== undefined ? `${index + 1}. ` : ''
-  const score = m.score !== undefined ? ` [score ${m.score.toFixed(3)}]` : ''
+  // The server emits `score: null` on GET /memories/{id}; only a real number is
+  // formattable, so guard on the type rather than on `undefined` alone.
+  const score = typeof m.score === 'number' ? ` [score ${m.score.toFixed(3)}]` : ''
   const id = m.id ? ` (${m.id})` : ''
   return `${prefix}${m.memory ?? '(empty)'}${id}${score}`
 }
@@ -112,7 +114,8 @@ const MEMORY_ROW_SCHEMA: JsonSchemaNode = {
     metadata: { oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
     created_at: { oneOf: [{ type: 'string' }, { type: 'null' }] },
     updated_at: { oneOf: [{ type: 'string' }, { type: 'null' }] },
-    score: { type: 'number' },
+    // Numeric on search hits, explicitly null on GET /memories/{id}.
+    score: { oneOf: [{ type: 'number' }, { type: 'null' }] },
   },
 }
 
@@ -253,7 +256,7 @@ export function mem0SearchTool(client: Mem0Client, config: () => Mem0Config): To
         },
         required: ['ok', 'count'],
       },
-      render: (args, value: { ok: boolean; count?: number; results?: Array<{ id?: string; memory?: string; score?: number }>; error?: string }) =>
+      render: (args, value: { ok: boolean; count?: number; results?: Array<{ id?: string; memory?: string; score?: number | null }>; error?: string }) =>
         text(
           value.ok
             ? `search "${String((args as { query?: string }).query ?? '')}" -> ${value.count ?? 0} result(s):\n${renderMemories(value.results as Mem0Memory[] | undefined)}`
