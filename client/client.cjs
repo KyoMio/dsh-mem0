@@ -30,7 +30,7 @@ window.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     const React = require('react')
-    const { createSnapshotStore } = require('@deepseek-ai/dsh-client-runtime/client')
+    const { createSnapshotStore } = require('@deepseek-ai/dsh-client-store')
 
     const h = React.createElement
 

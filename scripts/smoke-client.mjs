@@ -116,6 +116,10 @@ const factoryExports = handoff.factory((spec) => {
       return { createElement: (...args) => args, useState: (v) => [v, () => {}], Fragment: 'Fragment' }
     case 'react/jsx-runtime':
       return { Fragment: 'Fragment', jsx: () => null, jsxs: () => null }
+    // dsh >= 0.1.2-rc.1 moved the browser runtime into the front-end seed table
+    // under this specifier; the pre-rename one is kept so an older bundle still
+    // gets a clear pass/fail instead of a spurious "unexpected require".
+    case '@deepseek-ai/dsh-client-store':
     case '@deepseek-ai/dsh-client-runtime/client':
       return { createSnapshotStore: snapshotStore }
     default:
