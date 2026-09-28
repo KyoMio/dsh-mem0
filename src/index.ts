@@ -2,20 +2,21 @@
  * dsh-mem0: self-hosted mem0 memory operations for dsh.
  *
  * Host-side cordis plugin. Mounts a mem0 REST client configured through the
- * dsh settings section (baseUrl / apiKey / authType / default identifiers),
- * registers the mem0_* agent tools, announces itself to agents via a
- * system-prompt section, and serves the /api/dsh-mem0/config route family
- * that the browser-half settings card reads and writes (the harness settings
- * wire only exposes namespaces on its own allowlist).
+ * plugin's volatile Config (edited on the official Plugins page; the profile
+ * entry id `dsh-mem0` addresses the form), registers the mem0_* agent tools,
+ * and announces itself to agents via a system-prompt section. Config edits
+ * apply live: the client reads every field through .get() per request, and
+ * the tool/announcement registrations re-sync on loader/volatile-update.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection } from '@deepseek-ai/dsh-settings'
+// Type-only: the Loader's `loader/volatile-update` event merge (the plugin
+// also runs under compositions without a Loader, hence the optional peer).
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
-import { Config, MEM0_SETTINGS_NAMESPACE, resolveConfig, type Mem0Config } from './config.js'
+import { Config, readLiveConfig, type Mem0Config } from './config.js'
 import { Mem0Client } from './mem0-client.js'
-import { makeSettingsRoutes, type WebRoute } from './settings-routes.js'
 import {
   mem0AddTool,
   mem0DeleteTool,
@@ -33,8 +34,8 @@ export const name = 'mem0'
 /** Services required before the mem0 surfaces can mount. */
 export const inject = ['tools', 'systemPrompt']
 
-/** Settings namespace of the mem0 capability (the section the web settings surface edits). */
-export { MEM0_SETTINGS_NAMESPACE } from './config.js'
+/** Plugin configuration schema (volatile fields; the Plugins-page form derives from it). */
+export { Config } from './config.js'
 
 /** Order of the announcement section within the tool-guidance band. */
 const SECTION_ORDER = 150
@@ -54,16 +55,13 @@ export const MEM0_GUIDANCE =
 /**
  * Mount the mem0 client, tools, and announcement.
  * @param ctx - host plugin context carrying tools/systemPrompt.
- * @param config - resolved plugin config (schema defaults applied by the loader).
+ * @param config - live plugin config (volatile references, one per field).
  */
-export function apply(ctx: Context, config?: Mem0Config): void {
-  // The live source the surfaces read: the settings section once the web
-  // settings surface is served, the composition entry otherwise.
-  let current: () => Mem0Config = () => config ?? {}
-  const resolve = (): Mem0Config => resolveConfig(current())
+export function apply(ctx: Context, config: Config): void {
+  // Every surface resolves the live references per use, so Plugins-page
+  // edits (baseUrl / apiKey / defaults / switches) apply without a remount.
+  const resolve = (): Required<Mem0Config> => readLiveConfig(config)
 
-  // The client reads the live config on every request, so settings edits
-  // (baseUrl / apiKey / defaults) apply without re-registering the tools.
   const client = new Mem0Client(resolve)
 
   const tools = [
@@ -106,37 +104,10 @@ export function apply(ctx: Context, config?: Mem0Config): void {
     }, 'dsh-mem0: tools')
   }
 
-  installSettingsSection(ctx, MEM0_SETTINGS_NAMESPACE, Config, config ?? {}, {
-    setSource: (source) => {
-      current = source
-      sync()
-    },
-    onChange: sync,
-  })
+  // Live Config: a volatile update re-syncs the tool registrations and the
+  // announcement section (the enabled / announceToAgent switches).
+  ctx.on('loader/volatile-update', sync)
 
-  // /api/dsh-mem0/config — the settings card's read/write path. The harness
-  // settings wire only exposes namespaces on its own allowlist, so the card
-  // talks to this plugin-owned route instead. Register through the same
-  // scoped-inject mechanism as the settings section (rather than a plain
-  // ctx.get): it fires whenever the webserver becomes available, does not
-  // hard-depend on it (headless/CLI mounts simply never register), and does
-  // not rely on the `strict` flag of ctx.get, whose availability differs
-  // across dsh versions.
-  ctx.inject(['webServer'], (sctx) => {
-    // Inside the injected scope the webserver service is guaranteed ACTIVE,
-    // so even a strict get resolves it (and avoids the undeclared-property
-    // typing problem of `sctx.webServer`).
-    const webServer = sctx.get('webServer') as { register(route: WebRoute): () => void }
-    const disposers = makeSettingsRoutes(ctx).map((route) => webServer.register(route))
-    sctx.effect(
-      () => () => {
-        for (const dispose of disposers) dispose()
-      },
-      'dsh-mem0: config routes',
-    )
-  })
-
-  // Initial registration from the composition entry (covers deployments with
-  // no settings service, whose installSettingsSection never fires its hooks).
+  // Initial registration.
   sync()
 }

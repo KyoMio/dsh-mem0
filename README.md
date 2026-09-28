@@ -7,7 +7,9 @@
 带 dashboard，`X-API-Key` 认证，端点无 `/v1` 前缀）。
 
 热插拔：通过 `dsh plugin add link:<本目录>` 挂载，不改 dsh 源码。无侧边栏 UI，但带一个
-浏览器端：在设置面板 → 插件 → 插件配置里提供 `dsh-mem0` 配置卡片（编辑下面的配置项）。
+浏览器端：在插件页（Web 侧栏「插件」）给 `dsh-mem0` 行提供 Configure 配置页（编辑下面的
+配置项）。**需要 DSH ≥ 0.1.7-rc.2**（配置走插件的 volatile `Config` schema，由官方插件页
+的表单编辑）。
 
 ## 工具
 
@@ -44,7 +46,7 @@ dsh plugin --profile web add link:$(pwd)
 ## 发布
 
 打 `v*` 标签即触发 CI（`.github/workflows/release.yml`）自动构建并发布 GitHub Release：
-`pnpm build` → 四项离线冒烟 → `npm pack` 产物（`dsh-mem0-<version>.tgz`）挂到 Release，
+`pnpm build` → 三项离线冒烟 → `npm pack` 产物（`dsh-mem0-<version>.tgz`）挂到 Release，
 并自动生成 changelog。
 
 ```sh
@@ -54,13 +56,14 @@ git tag v0.1.2 && git push origin v0.1.2
 标签版本必须与 `package.json` 的 `version` 一致（不一致 CI 会失败）；若仓库设置了
 `NPM_TOKEN` secret，还会同步 `npm publish` 到 npm（未设置则跳过，不影响 Release）。
 
-运行时依赖（`@deepseek-ai/dsh-settings` / `@deepseek-ai/schemastery`）已列为
-硬依赖，`dsh plugin add` 会随包安装（profile 默认 `autoInstallPeers:false`，peerDependencies
-不会被装）。
+运行时与宿主共用实例的 `@deepseek-ai/*` 包（cordis / schemastery / dsh-*）都声明在
+`peerDependencies`：`dsh plugin add` 的 profile 默认 `autoInstallPeers:false` 不会安装
+它们，运行时由 dsh 的依赖解析层直接供给宿主自己的那份副本。
 
 ## 配置
 
-设置面板 → 插件 → 插件配置 → `dsh-mem0`（或插件构成里的 config 段）：
+插件页（Web 侧栏「插件」）→ 已安装的 `dsh-mem0` 包 → `dsh-mem0` 行 → **Configure**
+（或直接编辑该行的 profile config 段）：
 
 | 键 | 默认 | 说明 |
 |---|---|---|
@@ -73,15 +76,18 @@ git tag v0.1.2 && git push origin v0.1.2
 | `announceToAgent` | `true` | 是否向 Agent 宣告插件能力 |
 | `enabled` | `true` | 总开关 |
 
-配置经 dsh settings provider 持久化；`baseUrl` / `apiKey` / 默认标识符的修改即时生效，
-无需重启。
+配置即插件的 volatile `Config` schema（`src/config.ts`），由官方插件页的表单编辑、
+经活跃 profile 持久化；`baseUrl` / `apiKey` / 默认标识符的修改即时生效，无需重启。
 
-> 插件配置卡片由浏览器端提供（`client/client.cjs`），通过插件自带的
-> `/api/dsh-mem0/config` 路由（`src/settings-routes.ts`）读写配置——harness 的
-> settings 线上通道只开放白名单内的命名空间，插件无法自行加入。`apiKey` 在 schema 上
-> 标记为 `role('secret')`：路由只下发「已配置/未配置」标记，密钥字面量不会进入浏览器。
-> 修改宿主端代码（`src/`）后需重新 `pnpm build` 并重启 dsh web；仅改 `client/client.cjs`
-> 刷新页面即可。
+> 0.1.7 首次启动会把旧 `~/.dsh/settings.yaml` 的每个段一次性导入到**条目 id 与段名相同**
+> 的插件行——本插件条目 id 就是 `dsh-mem0`（`cordis.patch.yml`），旧段里的这 8 个字段
+> 会被原样接住，原文件改名为 `settings.yaml.imported`。
+>
+> `apiKey` 在 schema 上标记为 `role('secret')`：表单响应只携带「已配置/未配置」标记，
+> 密钥字面量不下发浏览器；留空保存即保持当前密钥。配置页由浏览器端
+> （`client/client.cjs`）在官方插件页的 `plugins.row.config` 插槽渲染，读写走共享的
+> `configForms` 服务。修改宿主端代码（`src/`）后需重新 `pnpm build` 并重启 dsh web；
+> 仅改 `client/client.cjs` 刷新页面即可。
 
 ## 开发
 

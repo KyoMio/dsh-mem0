@@ -22,9 +22,7 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-store",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-api-remotes"
+        "@deepseek-ai/dsh-client-ui-settings"
       ],
       "platform": "web"
     }
@@ -43,26 +41,29 @@
     "typecheck": "tsc --noEmit",
     "watch": "tsc -p tsconfig.build.json --watch",
     "smoke:client": "node scripts/smoke-client.mjs",
-    "smoke:routes": "node scripts/smoke-routes.mjs",
     "smoke:apply": "node scripts/load-test.mjs",
     "smoke:tools": "node scripts/smoke-tools.mjs"
   },
-  "dependencies": {
-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
-    "@deepseek-ai/schemastery": "^3.18.1"
-  },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6"
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/cordis-plugin-loader": "*",
+    "@deepseek-ai/dsh-llm": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.7-rc.2",
+    "@deepseek-ai/schemastery": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis-plugin-loader": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-session": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/cordis-plugin-loader": "1.0.5",
+    "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
+    "@deepseek-ai/schemastery": "3.18.4",
     "@types/node": "^22.20.0",
     "typescript": "~5.7.2"
   },

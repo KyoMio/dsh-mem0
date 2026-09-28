@@ -10,9 +10,11 @@ OSS build, `mem0/mem0-api-server`, dashboard included, `X-API-Key` auth,
 endpoints have no `/v1` prefix).
 
 Mounted via `dsh plugin add link:<this-directory>` — no dsh source changes.
-No sidebar UI, but it does ship a browser half: a `dsh-mem0` configuration
-card in Settings → Plugins → Plugin configuration that edits the settings
-below.
+No sidebar UI, but it does ship a browser half: a Configure configuration page
+on the `dsh-mem0` row of the Plugins page (Web sidebar → Plugins) that edits
+the settings below. **Requires DSH ≥ 0.1.7-rc.2** (configuration is the
+plugin's volatile `Config` schema, edited through the official Plugins-page
+form).
 
 ## Tools
 
@@ -46,15 +48,16 @@ dsh plugin --profile web add link:$(pwd)
 # Restart dsh web after installing
 ```
 
-The runtime dependencies (`@deepseek-ai/dsh-settings`, `@deepseek-ai/schemastery`)
-are hard dependencies, so `dsh plugin add` installs them with the
-package (profiles default to `autoInstallPeers:false`, so peerDependencies would
-not be installed).
+The `@deepseek-ai/*` packages whose instances must be shared with the host
+(cordis / schemastery / dsh-*) are declared in `peerDependencies`: profiles
+default to `autoInstallPeers:false`, so `dsh plugin add` does not install
+them — dsh's dependency-resolution layer supplies the running installation's
+own copies at runtime.
 
 ## Release
 
 Pushing a `v*` tag triggers CI (`.github/workflows/release.yml`) to build and
-publish a GitHub Release automatically: `pnpm build` → four offline smoke tests
+publish a GitHub Release automatically: `pnpm build` → three offline smoke tests
 → the `npm pack` artifact (`dsh-mem0-<version>.tgz`) is attached to the
 Release, with auto-generated changelog.
 
@@ -69,8 +72,9 @@ GitHub Release still happens.
 
 ## Configuration
 
-Settings → Plugins → Plugin configuration → `dsh-mem0` (or the config
-section of the plugin row in the composition):
+Plugins page (Web sidebar → Plugins) → the installed `dsh-mem0` package →
+the `dsh-mem0` row → **Configure** (or edit the row's config section in the
+profile directly):
 
 | Key | Default | Description |
 |---|---|---|
@@ -83,16 +87,23 @@ section of the plugin row in the composition):
 | `announceToAgent` | `true` | Announce the plugin to agents in the system prompt |
 | `enabled` | `true` | Master switch |
 
-Settings are persisted by the dsh settings provider; changes to `baseUrl` /
-`apiKey` / the default identifiers apply immediately, no restart needed.
+The configuration is the plugin's volatile `Config` schema (`src/config.ts`),
+edited by the official Plugins-page form and persisted through the active
+profile; changes to `baseUrl` / `apiKey` / the default identifiers apply
+immediately, no restart needed.
 
-> The configuration card is served by the browser half (`client/client.cjs`)
-> and reads/writes the settings through the plugin-owned
-> `/api/dsh-mem0/config` route (`src/settings-routes.ts`) — the harness's
-> settings wire only exposes namespaces on its own allowlist, which a plugin
-> cannot extend. `apiKey` is marked `role('secret')` in the schema: the route
-> only sends a "configured / not configured" flag, the key literal never
-> reaches the browser. After changing host-side code (`src/`) you must
+> On its first start, dsh 0.1.7 imports each section of the legacy
+> `~/.dsh/settings.yaml` once into the plugin row whose **entry id equals the
+> section name** — this plugin's entry id is `dsh-mem0` (`cordis.patch.yml`),
+> so the eight fields above carry over as-is; the file is then renamed to
+> `settings.yaml.imported`.
+>
+> `apiKey` is marked `role('secret')` in the schema: form responses carry only
+> a "configured / not configured" flag, the key literal never reaches the
+> browser; saving with the field blank keeps the current key. The configuration
+> page is rendered by the browser half (`client/client.cjs`) in the Plugins
+> page's `plugins.row.config` slot, reading and writing through the shared
+> `configForms` service. After changing host-side code (`src/`) you must
 > `pnpm build` and restart dsh web; a change to `client/client.cjs` alone only
 > needs a page refresh.
 
